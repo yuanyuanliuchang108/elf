@@ -1,0 +1,319 @@
+
+
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "xil_printf.h"
+#include "pl_bram_rd.h"
+#include "xbram.h"
+#include "xparameters.h"//器件参数信息
+#include "xuartps.h"//包含 PS UART 的函数声明
+#include "xscugic.h"//包含中断的函数声明
+#include "stdio.h"//包含 printf 函数的声明
+
+u32 senddata =0;
+u32 senddata1=0;
+u32 sendda[100];
+int cc=0;
+char ip[15]={0};
+char *iparr[1]={ip};
+int ch_data_len;
+#define UART_DEVICE_ID XPAR_PS7_UART_0_DEVICE_ID //串口设备 ID
+#define INTC_DEVICE_ID XPAR_SCUGIC_SINGLE_DEVICE_ID //中断 ID
+#define UART_INT_IRQ_ID XPAR_XUARTPS_0_INTR //串口中断 ID
+#define PL_BRAM_BASE        XPAR_PL_BRAM_RD_0_S00_AXI_BASEADDR   //PL_RAM_RD基地址
+#define PL_BRAM_START       PL_BRAM_RD_S00_AXI_SLV_REG0_OFFSET   //RAM读开始寄存器地址
+#define PL_BRAM_START_ADDR  PL_BRAM_RD_S00_AXI_SLV_REG1_OFFSET   //RAM起始寄存器地址
+#define PL_BRAM_LEN         PL_BRAM_RD_S00_AXI_SLV_REG2_OFFSET   //PL读RAM的深度
+#define PL_BRAM_RD_S00_AXI_SLV_REG3_OFFSET 12
+#define START_ADDR          0  //RAM起始地址 范围:0~1023
+#define BRAM_DATA_BYTE      4  //BRAM数据字节个数
+void str_wr_bram();
+void str_rd_bram();
+void int_to_u8(int num,u8 send[],int length)
+{//length是send的长度
+	int temp=0;
+	for(int i=0;i<length;i++)
+	{
+		temp = num%10+'0';
+		send[length-1-i]=temp;
+		num=num/10;
+	}
+}
+
+
+
+//XUartPs_Send(Uart_Ps);XUartPs_Recv
+ XScuGic Intc; //中断控制器驱动程序实例
+ XUartPs Uart_Ps; //串口驱动程序实例
+ char rec_data = 0 ;//接收到的数据
+ int count=0;
+ int cot=0;
+ int flag=0;
+
+	int i= BRAM_DATA_BYTE*START_ADDR;
+	int wr_cnt = 0;
+	int j =0;
+ int aa=0;
+char fifo[17]={0};
+ unsigned int ipint=0;
+ int ready=0;
+ unsigned int ip_to_int1(const char* ip) {
+     int a, b, c, d;
+
+     if (sscanf(ip, "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
+         return 0;
+     }
+
+     if (a < 0 || a > 255 || b < 0 || b > 255 ||
+         c < 0 || c > 255 || d < 0 || d > 255) {
+         return 0;
+     }
+
+     return (unsigned int)((a << 24) | (b << 16) | (c << 8) | d);
+ }
+
+ unsigned int ip_to_int2(const char* ip) {
+     unsigned int result = 0;
+     unsigned int part = 0;
+
+     // 遍历字符数组，直到遇到字符串结束符或换行符
+     for (int i = 0;   ip[i] != 'n'; i++) {
+         if (ip[i] == '.') {
+             // 遇到点号，将当前部分累加到结果中
+             result = (result << 8) | part;
+             part = 0;
+         }
+         else if (ip[i] >= '0' && ip[i] <= '9') {
+             // 数字字符，转换为数值
+             part = part * 10 + (ip[i] - '0');
+         }
+         else if (ip[i] == 'n') {
+             // 遇到\r则停止处理
+             break;
+         }
+     }
+
+     // 处理最后一部分IP地址
+     result = (result << 8) | part;
+
+     return result;
+ }
+
+ //UART 初始化函数
+ int uart_init(XUartPs* uart_ps)
+ {
+ int status;
+ XUartPs_Config *uart_cfg;
+
+ uart_cfg = XUartPs_LookupConfig(UART_DEVICE_ID);
+ if (NULL == uart_cfg)
+ return XST_FAILURE;
+ status = XUartPs_CfgInitialize(uart_ps, uart_cfg, uart_cfg->BaseAddress);
+ if (status != XST_SUCCESS)
+ return XST_FAILURE;
+
+ //UART 设备自检
+ status = XUartPs_SelfTest(uart_ps);
+ if (status != XST_SUCCESS)
+ return XST_FAILURE;
+
+ //设置工作模式:正常模式
+ XUartPs_SetOperMode(uart_ps, XUARTPS_OPER_MODE_NORMAL);
+ //设置波特率:115200
+ XUartPs_SetBaudRate(uart_ps,115200);
+ //设置 RxFIFO 的中断触发等级
+ XUartPs_SetFifoThreshold(uart_ps, 1);
+
+ return XST_SUCCESS;
+ }
+
+ //UART 中断处理函数
+ void uart_intr_handler(void *call_back_ref)
+ {
+ XUartPs *uart_instance_ptr = (XUartPs *) call_back_ref;
+
+ u32 isr_status ; //中断状态标志
+
+ //读取中断 ID 寄存器，判断触发的是哪种中断
+ isr_status = XUartPs_ReadReg(uart_instance_ptr->Config.BaseAddress,XUARTPS_IMR_OFFSET);
+ isr_status &= XUartPs_ReadReg(uart_instance_ptr->Config.BaseAddress,XUARTPS_ISR_OFFSET);
+
+ //判断中断标志位 RxFIFO 是否触发
+ if (isr_status & (u32)XUARTPS_IXR_RXOVR)
+ {
+ rec_data = XUartPs_RecvByte(XPAR_PS7_UART_0_BASEADDR);
+ fifo[count]=  rec_data;
+ count++;
+
+ if(rec_data=='n'){
+	 unsigned int temp=0;
+	/* for(int i=0;i<count;i++)
+	     {
+	    	 ip[i]=fifo[i];
+
+
+	     }*/
+if(wr_cnt==700)
+{
+	 i= BRAM_DATA_BYTE*START_ADDR;
+	 wr_cnt = 0;
+}
+	 count=0;
+	 //temp=ip_to_int1(fifo);
+	// XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,temp);
+
+
+
+
+
+
+
+ 	if(fifo[0]=='C' &&  fifo[1]=='C')
+ 	{
+
+
+ 			 ready=1;
+ 			// XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,ready);
+
+ 	}
+
+ 	else flag=1;
+
+
+ 	if(ready==1 && fifo[0]!='C'){
+
+ 		ipint =ip_to_int2(fifo);
+
+ 		 	  XBram_WriteReg(XPAR_BRAM_0_BASEADDR,i,ipint) ;
+
+ 		 	    	 PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_LEN , 4);
+ 		 	    	 PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START_ADDR, BRAM_DATA_BYTE*(START_ADDR+wr_cnt)) ;
+ 		 	    	            PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 1) ;
+ 		 	    	            PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 0) ;
+ 		 	    	            PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 2) ;
+
+
+ 		 	    	            PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 16) ;
+
+ 		 	    	            aa=PL_BRAM_RD_mReadReg(PL_BRAM_BASE,12 );
+ 		 	      //
+ 		 	      u8 send[8]={0};
+
+ 		 	      int_to_u8(aa,send,8);
+ 		 	      //u32 t=8;
+ 		 	      //print(send);
+
+                  senddata=0;
+
+                  //senddata=XUartPs_Send(&Uart_Ps,send,0);
+ 		 	      //senddata=XUartPs_Send(&Uart_Ps,send,t);
+ 		 	      //senddata=XUartPs_Send(&Uart_Ps,send,8);
+
+
+
+                //cc++;
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'c');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'o');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'u');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'n');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'t');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'i');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'s');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,':');
+                  for(int i=0;i<8;i++)
+                  {
+                 XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,send[i]);
+
+                  }
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'\r');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'\n');
+ 		     wr_cnt++;
+ 		     i += BRAM_DATA_BYTE;
+ 		     ready=0;
+
+
+ 	}
+
+
+	if(flag==1){
+				ipint=ip_to_int2(fifo);
+				XBram_WriteReg(XPAR_BRAM_0_BASEADDR,i,ipint);
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_LEN , 4);
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START_ADDR, BRAM_DATA_BYTE*(START_ADDR+wr_cnt)) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 1) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 0) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 2) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 4) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 8) ;
+		         PL_BRAM_RD_mWriteReg(PL_BRAM_BASE, PL_BRAM_START , 16) ;
+		         wr_cnt++;
+		         i+= BRAM_DATA_BYTE;
+		         flag=0;
+			}
+ }
+ }
+ //清除中断标志
+ XUartPs_WriteReg(uart_instance_ptr->Config.BaseAddress, XUARTPS_ISR_OFFSET, XUARTPS_IXR_RXOVR) ;
+ }
+
+
+
+
+ //串口中断初始化
+ int uart_intr_init(XScuGic *intc, XUartPs *uart_ps)
+ {
+ int status;
+ //初始化中断控制器
+ XScuGic_Config *intc_cfg;
+ intc_cfg = XScuGic_LookupConfig(INTC_DEVICE_ID);
+ if (NULL == intc_cfg)
+ return XST_FAILURE;
+ status = XScuGic_CfgInitialize(intc, intc_cfg, intc_cfg->CpuBaseAddress);
+ if (status != XST_SUCCESS)
+ return XST_FAILURE;
+
+ //设置并打开中断异常处理功能
+ Xil_ExceptionInit();
+ Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT,
+ (Xil_ExceptionHandler)XScuGic_InterruptHandler,
+ (void *)intc);
+ Xil_ExceptionEnable();
+
+ //为中断设置中断处理函数
+ XScuGic_Connect(intc, UART_INT_IRQ_ID, (Xil_ExceptionHandler) uart_intr_handler,(void *) uart_ps);
+ //设置 UART 的中断触发方式  RXFifo触发中断
+ XUartPs_SetInterruptMask(uart_ps, XUARTPS_IXR_RXOVR);
+ //使能 GIC 中的串口中断
+ XScuGic_Enable(intc, UART_INT_IRQ_ID);
+ return XST_SUCCESS;
+ }
+
+
+
+
+int main()
+{
+
+	 int status;
+
+	  status = uart_init(&Uart_Ps); //串口初始化
+	  if (status == XST_FAILURE) {
+	  xil_printf("Uart Initial Failed\r\n");
+	  return XST_FAILURE;
+	  }
+
+	  uart_intr_init(&Intc, &Uart_Ps);
+
+	  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'6');
+
+	while(1)
+	{
+
+		  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'7');
+		//  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'\r');
+		 // XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'\n');
+	}
+}
+

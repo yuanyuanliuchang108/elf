@@ -1,0 +1,17 @@
+#-----------------------------------------------------------
+# Vivado v2020.2 (64-bit)
+# SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+# IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+# Start of session at: Sun Jul  6 12:13:56 2025
+# Process ID: 52660
+# Current directory: E:/ps_pl_bram
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent52428 E:\ps_pl_bram\ps_pl_bram.xpr
+# Log file: E:/ps_pl_bram/vivado.log
+# Journal file: E:/ps_pl_bram\vivado.jou
+#-----------------------------------------------------------
+start_gui
+open_project E:/ps_pl_bram/ps_pl_bram.xpr
+update_compile_order -fileset sources_1
+ipx::edit_ip_in_project -upgrade true -name pl_bram_rd_v1_0_project -directory E:/ps_pl_bram/ps_pl_bram.tmp/pl_bram_rd_v1_0_project e:/ps_pl_bram/ip_repo/pl_bram_rd_1.0/component.xml
+update_compile_order -fileset sources_1
+close_project

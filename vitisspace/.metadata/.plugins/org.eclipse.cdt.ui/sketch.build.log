@@ -1,0 +1,29 @@
+12:20:47 **** Incremental Build of configuration Debug for project sketch ****
+make all 
+make --no-print-directory pre-build
+a9-linaro-pre-build-step
+' '
+make --no-print-directory main-build
+'Building file: ../src/helloworld.c'
+'Invoking: ARM v7 gcc compiler'
+arm-none-eabi-gcc -Wall -O0 -g3 -c -fmessage-length=0 -MT"src/helloworld.o" -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -IE:/vitisspace/systembram_wrapper/export/systembram_wrapper/sw/systembram_wrapper/standalone_ps7_cortexa9_0/bspinclude/include -MMD -MP -MF"src/helloworld.d" -MT"src/helloworld.o" -o "src/helloworld.o" "../src/helloworld.c"
+../src/helloworld.c: In function 'uart_intr_handler':
+../src/helloworld.c:151:16: warning: unused variable 'temp' [-Wunused-variable]
+  151 |   unsigned int temp=0;
+      |                ^~~~
+'Finished building: ../src/helloworld.c'
+' '
+'Building target: sketch.elf'
+'Invoking: ARM v7 gcc linker'
+arm-none-eabi-gcc -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -Wl,-build-id=none -specs=Xilinx.spec -Wl,-T -Wl,../src/lscript.ld -LE:/vitisspace/systembram_wrapper/export/systembram_wrapper/sw/systembram_wrapper/standalone_ps7_cortexa9_0/bsplib/lib -o "sketch.elf"  ./src/helloworld.o ./src/platform.o   -Wl,--start-group,-lxil,-lgcc,-lc,--end-group
+'Finished building target: sketch.elf'
+' '
+'Invoking: ARM v7 Print Size'
+arm-none-eabi-size sketch.elf  |tee "sketch.elf.size"
+   text	   data	    bss	    dec	    hex	filename
+  79284	   3374	  23248	 105906	  19db2	sketch.elf
+'Finished building: sketch.elf.size'
+' '
+
+12:20:51 Build Finished (took 3s.623ms)
+
