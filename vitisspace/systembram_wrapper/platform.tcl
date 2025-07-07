@@ -22,3 +22,4 @@ platform generate -quick
 platform generate
 platform active {systembram_wrapper}
 platform generate
+platform generate

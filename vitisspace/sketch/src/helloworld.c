@@ -79,7 +79,7 @@ char fifo[17]={0};
      unsigned int part = 0;
 
      // 遍历字符数组，直到遇到字符串结束符或换行符
-     for (int i = 0;   ip[i] != 'n'; i++) {
+     for (int i = 0;   ip[i] != ':'; i++) {
          if (ip[i] == '.') {
              // 遇到点号，将当前部分累加到结果中
              result = (result << 8) | part;
@@ -89,7 +89,7 @@ char fifo[17]={0};
              // 数字字符，转换为数值
              part = part * 10 + (ip[i] - '0');
          }
-         else if (ip[i] == 'n') {
+         else if (ip[i] == ':') {
              // 遇到\r则停止处理
              break;
          }
@@ -147,7 +147,7 @@ char fifo[17]={0};
  fifo[count]=  rec_data;
  count++;
 
- if(rec_data=='n'){
+ if(rec_data==':'){
 	 unsigned int temp=0;
 	/* for(int i=0;i<count;i++)
 	     {
@@ -170,7 +170,7 @@ if(wr_cnt==700)
 
 
 
- 	if(fifo[0]=='C' &&  fifo[1]=='C')
+ 	if(fifo[0]=='C' )
  	{
 
 
@@ -215,8 +215,8 @@ if(wr_cnt==700)
  		 	    	            aa=PL_BRAM_RD_mReadReg(PL_BRAM_BASE,12 );
  		 	      //
  		 	      u8 send[8]={0};
-
  		 	      int_to_u8(aa,send,8);
+
  		 	      //u32 t=8;
  		 	      //print(send);
 
@@ -229,11 +229,20 @@ if(wr_cnt==700)
 
 
                 //cc++;
+                  for(int i=0;fifo[i]!=':';i++)
+                  {
+                       XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,fifo[i]);
+
+                  }
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'  ');
                   XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'c');
                   XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'o');
                   XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'u');
                   XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'n');
                   XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'t');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'i');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'s');
+                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,'  ');
                   for(int i=0;i<8;i++)
                   {
                  XUartPs_SendByte(XPAR_PS7_UART_0_BASEADDR,send[i]);
